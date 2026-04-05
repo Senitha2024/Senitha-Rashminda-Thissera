@@ -1,0 +1,104 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user preferences and basic info",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Drawing": {
+      "title": "Drawing",
+      "description": "Stores a user's saved drawing",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "imageData": { "type": "string", "description": "Base64 image data" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "imageData", "createdAt"]
+    },
+    "LearnedItem": {
+      "title": "Learned Item",
+      "description": "Stores code for a drawing learned by the AI for a specific user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "code", "createdAt"]
+    },
+    "CommunityDrawing": {
+      "title": "Community Drawing",
+      "description": "Stores a drawing shared with the community",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "name": { "type": "string" },
+        "imageData": { "type": "string" },
+        "code": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "name", "createdAt"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "Stores a user's like on a community drawing",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Stores a user's comment on a community drawing",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile data"
+    },
+    "/drawings/{drawingId}": {
+      "schema": "Drawing",
+      "description": "User saved drawings"
+    },
+    "/learned_items/{itemId}": {
+      "schema": "LearnedItem",
+      "description": "AI learned drawing programs"
+    },
+    "/community_drawings/{drawingId}": {
+      "schema": "CommunityDrawing",
+      "description": "Community shared drawings"
+    },
+    "/community_drawings/{drawingId}/likes/{userId}": {
+      "schema": "Like",
+      "description": "Likes on a community drawing"
+    },
+    "/community_drawings/{drawingId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on a community drawing"
+    }
+  }
+}

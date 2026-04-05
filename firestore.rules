@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             isValidEmail(data.email) &&
+             data.createdAt is string;
+    }
+    function isValidDrawing(data) {
+      return data.keys().hasAll(['userId', 'imageData', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.imageData is string &&
+             data.imageData.size() < 1048576 && // Limit to ~1MB
+             data.createdAt is string;
+    }
+    function isValidLearnedItem(data) {
+      return data.keys().hasAll(['userId', 'name', 'code', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() < 100 &&
+             data.code is string && data.code.size() < 50000 &&
+             data.createdAt is string;
+    }
+    function isValidCommunityDrawing(data) {
+      return data.keys().hasAll(['userId', 'userName', 'name', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() < 100 &&
+             data.name is string && data.name.size() < 100 &&
+             data.createdAt is string &&
+             (
+               (data.keys().hasAll(['code']) && data.code is string && data.code.size() < 50000) ||
+               (data.keys().hasAll(['imageData']) && data.imageData is string && data.imageData.size() < 1048576)
+             ) &&
+             (!('likesCount' in data) || (data.likesCount is number && data.likesCount >= 0));
+    }
+    function isValidLike(data) {
+      return data.keys().hasAll(['userId', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.createdAt is string;
+    }
+    function isValidComment(data) {
+      return data.keys().hasAll(['userId', 'userName', 'text', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.userName is string && data.userName.size() < 100 &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 1000 &&
+             data.createdAt is string &&
+             (!('userPhoto' in data) || (data.userPhoto is string && data.userPhoto.size() < 500));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /drawings/{drawingId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidDrawing(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidDrawing(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /learned_items/{itemId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidLearnedItem(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidLearnedItem(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /community_drawings/{drawingId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAuthenticated() && isValidCommunityDrawing(request.resource.data);
+      allow update: if isAuthenticated() && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']) &&
+                      math.abs(request.resource.data.likesCount - resource.data.likesCount) == 1;
+      allow delete: if isAuthenticated() && isDocOwner();
+
+      match /likes/{userId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isOwner(userId) && isValidLike(request.resource.data) &&
+                        getAfter(/databases/$(database)/documents/community_drawings/$(drawingId)).data.likesCount == resource.data.likesCount + 1;
+        allow delete: if isAuthenticated() && isOwner(userId) &&
+                        getAfter(/databases/$(database)/documents/community_drawings/$(drawingId)).data.likesCount == resource.data.likesCount - 1;
+      }
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isValidComment(request.resource.data);
+        allow delete: if isAuthenticated() && (isDocOwner() || resource.data.userId == request.auth.uid);
+      }
+    }
+  }
+}
